@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Random Image Explorer</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    background: #f0f0f0;
+    cursor: grab;
+    font-family: sans-serif;
+  }
+  #container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    width: 100%;
+    height: 100%;
+    background-image: url('paper.jpg');
+    background-size: cover;
+    background-repeat: repeat;
+  }
+  .random-img {
+    position: absolute;
+    cursor: pointer;
+    width: 1%; /* <-- fixes flash issue */
+  }
+  #popup {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    border: 1px solid #888;
+    padding: 10px;
+    display: none;
+    z-index: 2000;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  }
+  #popup input {
+    width: 300px;
+  }
+  #popup button {
+    margin-left: 10px;
+  }
+  #resetBtn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 13px;
+    background: #fff;
+    border: 2px solid #000;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 1500;
+  }
+</style>
+</head>
+<body>
+
+<button id="resetBtn">Reset View</button>
+
+<div id="container">
+    <img src="almost.jpg" class="random-img" alt="Almost">
+    <img src="Gentle.jpg" class="random-img" alt="Gentle">
+    <img src="Isn't The System Great.jpg" class="random-img" alt="Isnt The System Great">
+    <img src="Loud Music.jpg" class="random-img" alt="Loud Music">
+    <img src="Nightmares Are Dreams Too.jpg" class="random-img" alt="Nightmares Are Dreams Too">
+    <img src="No Mouse Would In The World Would Ever Build A Mousetrap.jpg" class="random-img" alt="No Mouse Would In The World Would Ever Build A Mousetrap">
+    <img src="YOURE fAmiLIAR.jpg" class="random-img" alt="Your Familiar">
+    <img src="athazagoraphobia.jpg" class="random-img" alt="athazagoraphobia">
+    <img src="Terrible Friend.jpg" class="random-img" alt="Terrible Friend">
+    <img src="The Mirror.jpg" class="random-img" alt="The Mirror">
+    <img src="What A Smile Can Hide.jpg" class="random-img" alt="What A Smile Can Hide">
+    <img src="Apologize For Bleeding.jpg" class="random-img" alt="Apologize For Bleeding">
+    <img src="Go To Hell.jpg" class="random-img" alt="Go To Hell">
+</div>
+
+<div id="popup">
+  <input type="text" id="linkInput" readonly>
+  <button id="copyBtn">Copy</button>
+</div>
+
+<script>
+const container = document.getElementById('container');
+const resetBtn = document.getElementById('resetBtn');
+let scale = 1;
+let maxZoomOut = 1;
+let offsetX = 0, offsetY = 0;
+let isDragging = false, startX, startY;
+
+const images = document.querySelectorAll('.random-img');
+const popup = document.getElementById('popup');
+const linkInput = document.getElementById('linkInput');
+const copyBtn = document.getElementById('copyBtn');
+
+// overlap check
+function isOverlapping(x, y, size, positions) {
+  for (let pos of positions) {
+    if (Math.hypot(pos.x - x, pos.y - y) < size) return true;
+  }
+  return false;
+}
+
+// randomized placement
+function randomizeImages() {
+  const ww = window.innerWidth;
+  const wh = window.innerHeight;
+  const size = ww * 0.01;
+
+  let positions = [];
+
+  images.forEach(img => {
+    img.style.width = size + "px";
+
+    let x, y, tries = 0;
+    do {
+      x = Math.random() * (ww - size);
+      y = Math.random() * (wh - size);
+      tries++;
+    } while (isOverlapping(x + size/2, y + size/2, size, positions) && tries < 100);
+
+    positions.push({x: x + size/2, y: y + size/2});
+
+    img.style.left = x + "px";
+    img.style.top = y + "px";
+
+    img.dataset.posX = x;
+    img.dataset.posY = y;
+    img.dataset.width = size;
+    img.dataset.height = size;
+  });
+}
+
+// keep viewport inside background
+function clampOffsets() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const cw = w * scale;
+  const ch = h * scale;
+
+  offsetX = cw > w ? Math.min(offsetX, 0) : (w - cw) / 2;
+  offsetX = cw > w ? Math.max(offsetX, w - cw) : offsetX;
+
+  offsetY = ch > h ? Math.min(offsetY, 0) : (h - ch) / 2;
+  offsetY = ch > h ? Math.max(offsetY, h - ch) : offsetY;
+}
+
+// drag
+document.body.addEventListener("mousedown", e => {
+  isDragging = true;
+  startX = e.clientX - offsetX;
+  startY = e.clientY - offsetY;
+  document.body.style.cursor = "grabbing";
+});
+document.body.addEventListener("mouseup", () => {
+  isDragging = false;
+  document.body.style.cursor = "grab";
+});
+document.body.addEventListener("mousemove", e => {
+  if (!isDragging) return;
+  offsetX = e.clientX - startX;
+  offsetY = e.clientY - startY;
+  clampOffsets();
+  container.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+});
+
+// zoom
+document.body.addEventListener("wheel", e => {
+  e.preventDefault();
+  const zoomFactor = 1.12; // faster zoom
+  const mx = e.clientX;
+  const my = e.clientY;
+
+  let newScale = e.deltaY < 0 ? scale * zoomFactor : scale / zoomFactor;
+  if (newScale < maxZoomOut) newScale = maxZoomOut;
+
+  offsetX = mx - ((mx - offsetX) * newScale / scale);
+  offsetY = my - ((my - offsetY) * newScale / scale);
+
+  scale = newScale;
+  clampOffsets();
+  container.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+});
+
+// link popup
+images.forEach(img => {
+  img.addEventListener("click", e => {
+    e.stopPropagation();
+    const id = img.alt.replace(/\s/g, "_");
+    const url = `${location.origin}${location.pathname}?image=${id}`;
+    linkInput.value = url;
+    popup.style.display = "block";
+  });
+});
+
+copyBtn.addEventListener("click", () => {
+  linkInput.select();
+  document.execCommand("copy");
+});
+
+document.body.addEventListener("click", e => {
+  if (!popup.contains(e.target)) popup.style.display = "none";
+});
+
+// smooth reset animation
+function animateReset() {
+  const duration = 500;
+  const start = performance.now();
+  const startScale = scale;
+  const startX = offsetX;
+  const startY = offsetY;
+
+  function step(t) {
+    const p = Math.min((t - start) / duration, 1);
+    scale = startScale + (1 - startScale) * p;
+
+    offsetX = startX + (0 - startX) * p;
+    offsetY = startY + (0 - startY) * p;
+
+    clampOffsets();
+    container.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+resetBtn.addEventListener("click", animateReset);
+
+// auto-zoom on link
+window.addEventListener("load", () => {
+  randomizeImages();
+
+  const p = new URLSearchParams(location.search);
+  const id = p.get("image");
+  if (!id) return;
+
+  const target = [...images].find(i => i.alt.replace(/\s/g, "_") === id);
+  if (!target) return;
+
+  const ww = innerWidth;
+  const wh = innerHeight;
+
+  const x = parseFloat(target.dataset.posX);
+  const y = parseFloat(target.dataset.posY);
+  const imgH = parseFloat(target.dataset.height);
+
+  scale = (wh * 0.25) / imgH;
+  if (scale < maxZoomOut) scale = maxZoomOut;
+
+  offsetX = ww / 2 - x * scale;
+  offsetY = wh / 2 - y * scale;
+
+  clampOffsets();
+  container.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+});
+
+</script>
+</body>
+</html>
