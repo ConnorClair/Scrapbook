@@ -28,7 +28,8 @@
   .random-img {
     position: absolute;
     cursor: pointer;
-    width: 1%; /* <-- fixes flash issue */
+    width: 1%;
+    height: auto;
   }
   #popup {
     position: fixed;
@@ -99,37 +100,42 @@ const popup = document.getElementById('popup');
 const linkInput = document.getElementById('linkInput');
 const copyBtn = document.getElementById('copyBtn');
 
-// overlap check
-function isOverlapping(x, y, size, positions) {
-  for (let pos of positions) {
-    if (Math.hypot(pos.x - x, pos.y - y) < size) return true;
-  }
-  return false;
+// bounding box overlap check
+function boxesOverlap(a, b) {
+  return !(
+    a.x + a.w < b.x ||
+    a.x > b.x + b.w ||
+    a.y + a.h < b.y ||
+    a.y > b.y + b.h
+  );
 }
 
-// randomized placement
+// randomized placement (no overlap)
 function randomizeImages() {
   const ww = window.innerWidth;
   const wh = window.innerHeight;
   const size = ww * 0.01;
 
-  let positions = [];
+  const placed = [];
 
   images.forEach(img => {
     img.style.width = size + "px";
+    img.style.height = "auto";
 
     let x, y, tries = 0;
+    let box;
+
     do {
       x = Math.random() * (ww - size);
       y = Math.random() * (wh - size);
+
+      box = { x, y, w: size, h: size };
       tries++;
-    } while (isOverlapping(x + size/2, y + size/2, size, positions) && tries < 100);
+    } while (placed.some(p => boxesOverlap(p, box)) && tries < 500);
 
-    positions.push({x: x + size/2, y: y + size/2});
-
+    placed.push(box);
     img.style.left = x + "px";
     img.style.top = y + "px";
-
     img.dataset.posX = x;
     img.dataset.posY = y;
     img.dataset.width = size;
@@ -137,7 +143,7 @@ function randomizeImages() {
   });
 }
 
-// keep viewport inside background
+// clamp viewport inside background
 function clampOffsets() {
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -173,7 +179,7 @@ document.body.addEventListener("mousemove", e => {
 // zoom
 document.body.addEventListener("wheel", e => {
   e.preventDefault();
-  const zoomFactor = 1.12; // faster zoom
+  const zoomFactor = 1.12;
   const mx = e.clientX;
   const my = e.clientY;
 
@@ -249,18 +255,23 @@ window.addEventListener("load", () => {
 
   const x = parseFloat(target.dataset.posX);
   const y = parseFloat(target.dataset.posY);
-  const imgH = parseFloat(target.dataset.height);
+  const w = parseFloat(target.dataset.width);
+  const h = parseFloat(target.dataset.height);
 
-  scale = (wh * 0.25) / imgH;
+  const centerX = x + w / 2;
+  const centerY = y + h / 2;
+
+  scale = (wh * 0.25) / h;
   if (scale < maxZoomOut) scale = maxZoomOut;
 
-  offsetX = ww / 2 - x * scale;
-  offsetY = wh / 2 - y * scale;
+  offsetX = ww / 2 - centerX * scale;
+  offsetY = wh / 2 - centerY * scale;
 
   clampOffsets();
   container.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
 });
 
+window.addEventListener("resize", randomizeImages);
 </script>
 </body>
 </html>
